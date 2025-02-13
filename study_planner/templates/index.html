@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Study Planner</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        title {
+            color: #d3cccc;
+        }
+        
+        /* Change background color here */
+        body {
+            background: linear-gradient(150deg, #000428, #004e92);
+            color: #ffffff; /* White text for better contrast */
+        }
+        
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: #2d2d2d; /* Darker card background */
+            color: #ffffff; /* White text for cards */
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f4ecec; /* Darker result background */
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #ffffff; /* White text for results */
+        }
+        .topic-input {
+            margin-bottom: 10px;
+        }
+        .form-label {
+            color: #ffffff; /* White text for labels */
+        }
+        .form-control, .form-select {
+            background-color: #fefdfd; /* Darker input background */
+            color: #110f0f; /* White text for inputs */
+            border: 1px solid #f4f1f1; /* Slightly lighter border */
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #d1cece; /* Slightly lighter focus background */
+            border-color: #0d6efd; /* Blue border on focus */
+            color: #433d3d; /* White text on focus */
+        }
+        .table {
+            color: #ffffff; /* White text for tables */
+        }
+        .table-bordered th, .table-bordered td {
+            border-color: #555; /* Slightly lighter border for table cells */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card p-4">
+            <h1 class="text-center mb-4">Student Study Planner</h1>
+
+            <!-- Form to Add Subject and Topics -->
+            <form id="addSubjectForm" action="/add_subject" method="POST">
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject:</label>
+                    <input type="text" class="form-control" id="subject" name="subject" placeholder="Enter subject" required>
+                </div>
+                <div id="topicFields">
+                    <div class="topic-input">
+                        <label class="form-label">Topic:</label>
+                        <input type="text" class="form-control" name="topics[]" placeholder="Enter topic" required>
+                        <label class="form-label mt-2">Difficulty:</label>
+                        <select class="form-select" name="difficulty[]" required>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary mt-2" id="addTopicBtn">Add Another Topic</button>
+                <button type="submit" class="btn btn-primary w-100 mt-3">Add Subject</button>
+            </form>
+
+            <!-- Form to Get Study Plan -->
+            <form id="studyForm" class="mt-5">
+                <div class="mb-3">
+                    <label for="studySubject" class="form-label">Select Subject:</label>
+                    <select class="form-select" id="studySubject" name="subject" required>
+                        {% for subject in subjects %}
+                            <option value="{{ subject }}">{{ subject }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="deadline" class="form-label">Deadline:</label>
+                    <input type="date" class="form-control" id="deadline" name="deadline" required>
+                </div>
+                <div class="mb-3">
+                    <label for="study_time" class="form-label">Study Time (hours):</label>
+                    <input type="number" class="form-control" id="study_time" name="study_time" placeholder="Enter study time" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Get Study Plan</button>
+            </form>
+
+            <div class="result mt-4" id="result">
+                <div id="studyAdvice"></div>
+                <div id="studySchedule" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+
+    <script>
+        // Add more topic fields dynamically
+        document.getElementById("addTopicBtn").addEventListener("click", () => {
+            const topicFields = document.getElementById("topicFields");
+            const newTopicField = document.createElement("div");
+            newTopicField.classList.add("topic-input");
+            newTopicField.innerHTML = `
+                <label class="form-label">Topic:</label>
+                <input type="text" class="form-control" name="topics[]" placeholder="Enter topic" required>
+                <label class="form-label mt-2">Difficulty:</label>
+                <select class="form-select" name="difficulty[]" required>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            `;
+            topicFields.appendChild(newTopicField);
+        });
+
+        // Handle study plan form submission
+        document.getElementById("studyForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const subject = document.getElementById("studySubject").value;
+            const deadline = document.getElementById("deadline").value;
+            const study_time = document.getElementById("study_time").value;
+
+            const response = await fetch("/get_study_plan", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ subject, deadline, study_time })
+            });
+
+            const data = await response.json();
+            const studyAdviceDiv = document.getElementById("studyAdvice");
+            const studyScheduleDiv = document.getElementById("studySchedule");
+
+            if (data.success) {
+                // Display study advice
+                studyAdviceDiv.innerHTML = `
+                    <div class="card p-3">
+                        <h3 class="card-title" >Study Advice:</h3>
+                        <p class="card-text">${data.advice.replace(/\n/g, "<br>")}</p>
+                    </div>
+                `;
+
+                // Display study schedule
+                let scheduleHTML = `<h3 class="mb-3"  >Study Schedule:</h3>`;
+                scheduleHTML += `<table class="table table-bordered">`;
+                scheduleHTML += `
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Topics</th>
+                            <th>Study Time (hours)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                `;
+
+                data.schedule.forEach(day => {
+                    scheduleHTML += `
+                        <tr>
+                            <td>${day.day}</td>
+                            <td>${day.topics.map(topic => `${topic.topic} (${topic.difficulty})`).join(", ")}</td>
+                            <td>${day.study_time.toFixed(1)}</td>
+                        </tr>
+                    `;
+                });
+
+                scheduleHTML += `</tbody></table>`;
+                studyScheduleDiv.innerHTML = scheduleHTML;
+            } else {
+                studyAdviceDiv.innerHTML = `<p class="text-danger">Error: ${data.error}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
